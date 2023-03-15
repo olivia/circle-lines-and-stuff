@@ -17,10 +17,10 @@ function makeLevel()
   for i = 0, (SH * SW) / (CD * RD) do
     if math.random() < 0.1 then
       local group = math.ceil(math.random() * 3)
-      drawList[group][1 + #drawList[group]] = i
-      lookup[i + 1] = group
+      table.insert(drawList[group], i)
+      table.insert(lookup, group)
     else
-      lookup[i + 1] = 0
+      table.insert(lookup, 0)
     end
   end
   return lookup, drawList

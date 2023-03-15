@@ -158,6 +158,21 @@ function clearSandboxImg()
     gfx.popContext()
 end
 
+function canStartSegment()
+    return isOnCircle() and not drawMode
+end
+
+function canEndSegment(x, y)
+    local lineseg = playdate.geometry.lineSegment.new(prevx, prevy, x, y)
+    for _, v in pairs(linesegs) do
+        local intersection, ls = lineseg:intersectsLineSegment(v)
+        if intersection and (ls:distanceToPoint(playdate.geometry.point.new(x, y)) > 5) and (ls:distanceToPoint(playdate.geometry.point.new(prevx, prevy)) > 5) then
+            return false
+        end
+    end
+    return drawMode
+end
+
 function playdate.update()
     -- Poll the d-pad and move our player accordingly.
     -- (There are multiple ways to read the d-pad; this is the simplest.)
@@ -173,11 +188,11 @@ function playdate.update()
         gfx.sprite.redrawBackground()
     end
     if playdate.buttonJustReleased(playdate.kButtonA) then
-        if (isOnCircle() and not drawMode) then
-            prevx, prevy = playerSprite:getPosition()
+        local x, y = playerSprite:getPosition()
+        if canStartSegment() then
+            prevx, prevy = x, y
             drawMode = not drawMode
-        elseif drawMode then
-            x, y = playerSprite:getPosition()
+        elseif canEndSegment(x, y) then
             linesegs[1 + #linesegs] = playdate.geometry.lineSegment.new(prevx, prevy, x, y)
             drawMode = not drawMode
         end
