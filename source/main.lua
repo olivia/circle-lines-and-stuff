@@ -1,6 +1,7 @@
 import "CoreLibs/object"
 import "CoreLibs/graphics"
 import "CoreLibs/sprites"
+import "CoreLibs/animation"
 import "CoreLibs/timer"
 import "CoreLibs/math"
 import "constants"
@@ -22,30 +23,58 @@ local sandboxImg = nil
 local imgOffsetX, imgOffsetY = 20, 20
 local drawMode = false
 local wc, bc, cc = gfx.kColorWhite, gfx.kColorBlack, gfx.kColorClear
-local sHeight,sWidth =  240,400
-local colWidth, rowWidth = 20,20
+local sHeight, sWidth = 240, 400
+local colWidth, rowWidth = 20, 20
 local level = makeLevel()
+local blinker = gfx.animation.blinker.new(800, 800, true)
+local cursorImg = nil
+local cursorSprite = nil
+local prevBlinkState = false
 
+function initCursor()
+    gfx.pushContext(cursorImg)
+    gfx.setColor(bc)
+    gfx.fillCircleInRect(0, 0, 8, 8)
+    gfx.popContext()
+end
 
-
+function paintCursor()
+    if (prevBlinkState ~= blinker.on) then
+        gfx.pushContext(cursorImg)
+        if drawMode or blinker.on then
+            gfx.setColor(bc)
+        else
+            gfx.setColor(cc)
+        end
+        gfx.fillCircleInRect(0, 0, 8, 8)
+        prevBlinkState = blinker.on
+        gfx.popContext()
+    end
+end
 
 function myGameSetUp()
     -- Set up the player sprite.
     -- The :setCenter() call specifies that the sprite will be anchored at its center.
     -- The :moveTo() call moves our sprite to the center of the display.
 
-    local playerImage = gfx.image.new("Images/crosshair")
-    assert(playerImage) -- make sure the image was where we thought
-
-    playerSprite = gfx.sprite.new(playerImage)
-    gfx.sprite.add(playerSprite)
-    playerSprite:moveTo(1+CD/2, 1+RD/2) -- this is where the center of the sprite is placed; (200,120) is the center of the Playdate screen
-
-
+    --local playerImage = gfx.image.new("Images/crosshair")
+    --assert(playerImage) -- make sure the image was where we thought
+    cursorImg = gfx.image.new(10, 10)
     sandboxImg = gfx.image.new(360, 200)
+
+    playerSprite = gfx.sprite.new(cursorImg)
+    playerSprite:moveTo(1 + CD / 2, 1 + RD / 2) -- this is where the center of the sprite is placed; (200,120) is the center of the Playdate screen
+
+
+    initCursor()
     local sandboxSprite = gfx.sprite.new(sandboxImg)
     gfx.sprite.add(sandboxSprite)
-    sandboxSprite:moveTo(180 + imgOffsetX, 100 + imgOffsetY)
+    gfx.sprite.add(playerSprite)
+    blinker:startLoop()
+    --    gfx.sprite.add(cursorSprite)
+
+
+    --sandboxSprite:moveTo(180 + imgOffsetX, 100 + imgOffsetY)
     -- We want an environment displayed behind our sprite.
     -- There are generally two ways to do this:
     -- 1) Use setBackgroundDrawingCallback() to draw a background image. (This is what we're doing below.)
@@ -97,14 +126,13 @@ local spacingY = 7
 
 
 function drawGrid()
-  for i in range(0, SW, CD) do
-    gfx.drawLine(i,0,i,SH)
-  end
-  for i in range(0, SH, RD) do
-    gfx.drawLine(0,i,SW,i)
-  end
+    for i in range(0, SW, CD) do
+        gfx.drawLine(i, 0, i, SH)
+    end
+    for i in range(0, SH, RD) do
+        gfx.drawLine(0, i, SW, i)
+    end
 end
-
 
 function drawTrail(num, x, y)
     local spacingX = 0
@@ -149,6 +177,9 @@ function playdate.update()
     -- Note that it is possible for more than one of these directions
     -- to be pressed at once, if the user is pressing diagonally.
     newTrailNum = math.floor(((450 + playdate.getCrankPosition()) % 360) / 45)
+
+    gfx.animation.blinker.updateAll()
+    paintCursor()
 
     if trailNum ~= newTrailNum then
         trailNum = newTrailNum
