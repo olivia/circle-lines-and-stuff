@@ -12,23 +12,36 @@ import "constants"
 
 local gfx <const> = playdate.graphics
 function makeLevel()
-  local a = {}
-  for i=0, (SH * SW) /(CD*RD) do
-    if math.random()<0.1 then
-      a[i+1] = math.ceil(math.random()*3)
-    else 
-      a[i+1] = 0
+  local lookup = {}
+  local drawList = { {}, {}, {} }
+  for i = 0, (SH * SW) / (CD * RD) do
+    if math.random() < 0.1 then
+      local group = math.ceil(math.random() * 3)
+      drawList[group][1 + #drawList[group]] = i
+      lookup[i + 1] = group
+    else
+      lookup[i + 1] = 0
     end
   end
-  return a
+  return lookup, drawList
 end
 
-function drawLevel(a)
-  for i=0, (SH * SW) /(CD*RD) do
-    local colNum = SW/CD
-    local padding = 4
-    if a[i+1]>0 then
-      gfx.drawCircleInRect(padding + CD* (i % colNum),padding +  RD * math.floor(i/colNum), CD- padding*2, RD - padding*2)
+function drawLevel(a, highlightedGroup, arrPlayerPos)
+  gfx.setLineWidth(2)
+  gfx.setColor(bc)
+  for _, v in ipairs(a) do
+    for __, g in ipairs(v) do
+      local colNum = SW / CD
+      local padding = 4
+      if _ == highlightedGroup and (g + 1) ~= arrPlayerPos then
+        gfx.fillCircleInRect(padding + CD * (g % colNum), padding + RD * math.floor(g / colNum), CD - padding * 2,
+          RD - padding * 2)
+      end
+      gfx.drawCircleInRect(padding + CD * (g % colNum), padding + RD * math.floor(g / colNum), CD - padding * 2,
+        RD - padding * 2)
+      gfx.setColor(bc)
     end
   end
+
+  gfx.setLineWidth(1)
 end

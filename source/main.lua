@@ -22,14 +22,12 @@ local playerSprite = nil
 local sandboxImg = nil
 local imgOffsetX, imgOffsetY = 20, 20
 local drawMode = false
-local wc, bc, cc = gfx.kColorWhite, gfx.kColorBlack, gfx.kColorClear
-local sHeight, sWidth = 240, 400
-local colWidth, rowWidth = 20, 20
-local level = makeLevel()
+local level, groups = makeLevel()
 local blinker = gfx.animation.blinker.new(800, 800, true)
 local cursorImg = nil
 local cursorSprite = nil
 local prevBlinkState = false
+local linesegs = {}
 
 function initCursor()
     gfx.pushContext(cursorImg)
@@ -46,9 +44,10 @@ function paintCursor()
         else
             gfx.setColor(cc)
         end
-        gfx.fillCircleInRect(0, 0, 8, 8)
+        -- gfx.fillCircleInRect(0, 0, 8, 8)
         prevBlinkState = blinker.on
         gfx.popContext()
+        gfx.sprite.redrawBackground()
     end
 end
 
@@ -93,7 +92,6 @@ function myGameSetUp()
             -- gfx.setColor(bc)
             -- gfx.drawRect(20, 20, 360, 200)
             drawGrid()
-            drawLevel(level)
         end
     )
 end
@@ -124,6 +122,25 @@ local prevx, prevy = playerSprite:getPosition()
 local trailNum = 3
 local spacingY = 7
 
+function getArrayPos()
+    return getPosToArrayPos(playerSprite:getPosition())
+end
+
+function getPrevArrayPos()
+    return getPosToArrayPos(prevx, prevy)
+end
+
+function getPosToArrayPos(x, y)
+    return 1 + math.floor((x // CD) + YD * math.floor(y // RD))
+end
+
+function isOnCircle()
+    return level[getArrayPos()] > 0
+end
+
+function isPrevOnCircle()
+    return level[getPrevArrayPos()] > 0
+end
 
 function drawGrid()
     for i in range(0, SW, CD) do
@@ -132,36 +149,6 @@ function drawGrid()
     for i in range(0, SH, RD) do
         gfx.drawLine(0, i, SW, i)
     end
-end
-
-function drawTrail(num, x, y)
-    local spacingX = 0
-    for i in range(-0 - math.floor(num / 2), -1 + num - math.floor(num / 2), 1) do
-        gfx.drawLine(prevx - imgOffsetX, prevy - imgOffsetY + (i * spacingY), x - imgOffsetX,
-            y - imgOffsetY + (i * spacingY))
-        gfx.drawLine(prevx - imgOffsetX - 1, prevy - imgOffsetY - 2 + (i * spacingY), x - imgOffsetX - 1,
-            y - imgOffsetY - 2 + (i * spacingY))
-        gfx.drawLine(prevx - imgOffsetX - 3, prevy - imgOffsetY + 1 + (i * spacingY), x - imgOffsetX - 3,
-            y - imgOffsetY + 1 + (i * spacingY))
-    end
-end
-
-function drawGhostTrail(num, x, y)
-    local spacingX = 0
-    for i in range(-0 - math.floor(num / 2), -1 + num - math.floor(num / 2), 1) do
-        gfx.drawPixel(x - 1, y + (i * spacingY))
-    end
-end
-
-function updateSandboxImg()
-    local x, y = playerSprite:getPosition()
-    if drawMode then
-        gfx.setColor(bc)
-        gfx.pushContext(sandboxImg)
-        drawTrail(trailNum, x, y)
-        gfx.popContext()
-    end
-    prevx, prevy = x, y
 end
 
 function clearSandboxImg()
@@ -186,27 +173,35 @@ function playdate.update()
         gfx.sprite.redrawBackground()
     end
     if playdate.buttonJustReleased(playdate.kButtonA) then
-        drawMode = not drawMode
+        if (isOnCircle() and not drawMode) then
+            prevx, prevy = playerSprite:getPosition()
+            drawMode = not drawMode
+        elseif drawMode then
+            x, y = playerSprite:getPosition()
+            linesegs[1 + #linesegs] = playdate.geometry.lineSegment.new(prevx, prevy, x, y)
+            drawMode = not drawMode
+        end
         gfx.sprite.redrawBackground()
     end
     if playdate.buttonJustReleased(playdate.kButtonB) then
-        clearSandboxImg()
+        table.remove(linesegs, #linesegs)
+        gfx.sprite.redrawBackground()
     end
     if playdate.buttonJustReleased(playdate.kButtonUp) then
         playerSprite:moveBy(0, -RD)
-        updateSandboxImg()
+        gfx.sprite.redrawBackground()
     end
     if playdate.buttonJustReleased(playdate.kButtonRight) then
         playerSprite:moveBy(CD, 0)
-        updateSandboxImg()
+        gfx.sprite.redrawBackground()
     end
     if playdate.buttonJustReleased(playdate.kButtonDown) then
         playerSprite:moveBy(0, RD)
-        updateSandboxImg()
+        gfx.sprite.redrawBackground()
     end
     if playdate.buttonJustReleased(playdate.kButtonLeft) then
         playerSprite:moveBy(-CD, 0)
-        updateSandboxImg()
+        gfx.sprite.redrawBackground()
     end
 
     -- Call the functions below in playdate.update() to draw sprites and keep
@@ -219,11 +214,43 @@ end
 
 gfx.sprite.setBackgroundDrawingCallback(
     function(_x, _y, width, height)
-        local x, y = playerSprite:getPosition()
-        if drawMode then
-            drawGhostTrail(trailNum, x, y)
-            prevx = x
-            prevy = y
+        if blinker.on and drawMode then
+            local arrPlayerPos = getPrevArrayPos()
+            local highlightedGroup = level[arrPlayerPos]
+            drawLevel(groups, highlightedGroup, arrPlayerPos)
+        elseif blinker.on then
+            local arrPlayerPos = getArrayPos()
+            local highlightedGroup = level[getArrayPos()]
+            drawLevel(groups, highlightedGroup, arrPlayerPos)
+        else
+            drawLevel(groups, level, -1)
         end
+    end
+)
+
+function retryLevel()
+    linesegs = {}
+    level, groups = makeLevel()
+    drawMode = false
+    playerSprite:moveTo(1 + CD / 2, 1 + RD / 2) -- this is where the center of the sprite is placed; (200,120) is the center of the Playdate screen
+    gfx.sprite.redrawBackground()
+end
+
+local menu = playdate.getSystemMenu()
+
+local menuItem, error = menu:addMenuItem("Retry Level", retryLevel)
+
+
+gfx.sprite.setBackgroundDrawingCallback(
+    function(_x, _y, width, height)
+        gfx.setLineWidth(2)
+        for i, v in ipairs(linesegs) do
+            gfx.drawLine(v)
+        end
+        if drawMode then
+            local x, y = playerSprite:getPosition()
+            gfx.drawLine(prevx, prevy, x, y)
+        end
+        gfx.setLineWidth(1)
     end
 )
