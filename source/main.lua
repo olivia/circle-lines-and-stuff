@@ -5,7 +5,7 @@ import "CoreLibs/animation"
 import "CoreLibs/timer"
 import "CoreLibs/math"
 import "constants"
-import "l1"
+import "level"
 
 -- Declaring this "gfx" shorthand will make your life easier. Instead of having
 -- to preface all graphics calls with "playdate.graphics", just use "gfx."
@@ -30,9 +30,12 @@ local prevBlinkState = false
 local linesegs = {}
 
 function initCursor()
+    local lw = 3
     gfx.pushContext(cursorImg)
-    gfx.setColor(bc)
-    gfx.fillCircleInRect(0, 0, 8, 8)
+    gfx.setLineWidth(lw)
+    gfx.setColor(gfx.kColorBlack)
+    gfx.drawRect(lw, lw, CD - lw / 2, RD - lw / 2)
+    gfx.setLineWidth(1)
     gfx.popContext()
 end
 
@@ -44,7 +47,6 @@ function paintCursor()
         else
             gfx.setColor(cc)
         end
-        -- gfx.fillCircleInRect(0, 0, 8, 8)
         prevBlinkState = blinker.on
         gfx.popContext()
         gfx.sprite.redrawBackground()
@@ -58,11 +60,11 @@ function myGameSetUp()
 
     --local playerImage = gfx.image.new("Images/crosshair")
     --assert(playerImage) -- make sure the image was where we thought
-    cursorImg = gfx.image.new(10, 10)
+    cursorImg = gfx.image.new(CD + 3, RD + 3)
     sandboxImg = gfx.image.new(360, 200)
 
     playerSprite = gfx.sprite.new(cursorImg)
-    playerSprite:moveTo(1 + CD / 2, 1 + RD / 2) -- this is where the center of the sprite is placed; (200,120) is the center of the Playdate screen
+    playerSprite:moveTo(CD / 2, RD / 2) -- this is where the center of the sprite is placed; (200,120) is the center of the Playdate screen
 
 
     initCursor()

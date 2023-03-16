@@ -6,7 +6,7 @@
     {
       "label": "sim",
       "type": "shell",
-      "command": "PlaydateSimulator.app dist.pdx",
+      "command": "PlaydateSimulator dist.pdx",
       "problemMatcher": [],
       "dependsOn": ["compile"]
     },
