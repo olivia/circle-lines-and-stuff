@@ -5,7 +5,11 @@ import "CoreLibs/animation"
 import "CoreLibs/timer"
 import "CoreLibs/math"
 import "constants"
+import "utils"
+import "cursor"
+import "blink"
 import "level"
+
 
 -- Declaring this "gfx" shorthand will make your life easier. Instead of having
 -- to preface all graphics calls with "playdate.graphics", just use "gfx."
@@ -13,80 +17,29 @@ import "level"
 -- NOTE: Because it's local, you'll have to do it in every .lua source file.
 
 local gfx <const> = playdate.graphics
-local mth <const> = playdate.math
 local sound <const> = playdate.sound
 local synth <const> = playdate.sound.synth
 
 -- Here's our player sprite declaration. We'll scope it to this file because
 -- several functions need to access it.
 
-local sandboxImg = nil
-local imgOffsetX, imgOffsetY = 20, 20
 local drawMode = false
 local level, levelWithSegments, groups, linesegs = initLevel()
-local blinker = gfx.animation.blinker.new(800, 800, true)
-local cursorImg = nil
-local cursorSprite = nil
-local prevBlinkState = false
 local synthSound = synth.new(sound.kWaveNoise)
-
-function setInitCursorPos()
-    cursorSprite:moveTo(CD / 2, RD / 2) -- this is where the center of the sprite is placed; (200,120) is the center of the Playdate screen
-end
-
-function initCursor()
-    local lw = 3
-    setInitCursorPos()
-    gfx.pushContext(cursorImg)
-    gfx.setLineWidth(lw)
-    gfx.setColor(gfx.kColorBlack)
-    gfx.drawRect(lw, lw, CD - lw / 2, RD - lw / 2)
-    gfx.setLineWidth(1)
-    gfx.popContext()
-end
-
-function paintCursor()
-    if (prevBlinkState ~= blinker.on) then
-        gfx.pushContext(cursorImg)
-        if drawMode or blinker.on then
-            gfx.setColor(bc)
-        else
-            gfx.setColor(cc)
-        end
-        prevBlinkState = blinker.on
-        gfx.popContext()
-        gfx.sprite.redrawBackground()
-    end
-end
 
 function myGameSetUp()
     -- Set up the player sprite.
     -- The :setCenter() call specifies that the sprite will be anchored at its center.
     -- The :moveTo() call moves our sprite to the center of the display.
-
-    --local playerImage = gfx.image.new("Images/crosshair")
-    --assert(playerImage) -- make sure the image was where we thought
-    cursorImg = gfx.image.new(CD + 3, RD + 3)
-    sandboxImg = gfx.image.new(360, 200)
-
-    cursorSprite = gfx.sprite.new(cursorImg)
     initCursor()
-    local sandboxSprite = gfx.sprite.new(sandboxImg)
-    gfx.sprite.add(sandboxSprite)
-    gfx.sprite.add(cursorSprite)
-    blinker:startLoop()
-
-
+    initBlinker()
+    startBlinkLoop()
     -- We want an environment displayed behind our sprite.
     -- There are generally two ways to do this:
     -- 1) Use setBackgroundDrawingCallback() to draw a background image. (This is what we're doing below.)
     -- 2) Use a tilemap, assign it to a sprite with sprite:setTilemap(tilemap),
     --       and call :setZIndex() with some low number so the background stays behind
     --       your other sprites.
-
-    local backgroundImage = gfx.image.new("Images/background")
-    assert(backgroundImage)
-
     gfx.sprite.setBackgroundDrawingCallback(
         function(x, y, width, height)
             -- gfx.setClipRect(x, y, width, height) -- let's only draw the part of the screen that's dirty
@@ -98,35 +51,27 @@ function myGameSetUp()
     )
 end
 
-function range(from, to, step)
-    step = step or 1
-    return function(_, lastvalue)
-        local nextvalue = lastvalue + step
-        if step > 0 and nextvalue <= to or step < 0 and nextvalue >= to or
-            step == 0
-        then
-            return nextvalue
-        end
-    end, nil, from - step
-end
-
 -- Now we'll call the function above to configure our game.
 -- After this runs (it just runs once), nearly everything will be
 -- controlled by the OS calling `playdate.update()` 30 times a second.
 
 myGameSetUp()
-local prevx, prevy = cursorSprite:getPosition()
+local prevx, prevy = getCursorPosition()
+
+function retryLevel()
+    drawMode = false
+    level, levelWithSegments, groups, linesegs = initLevel()
+    setInitCursorPos()
+    prevx, prevy = getCursorPosition()
+    gfx.sprite.redrawBackground()
+end
+
+local menu = playdate.getSystemMenu()
+menu:addMenuItem("Retry Level", retryLevel)
 
 -- `playdate.update()` is the heart of every Playdate game.
 -- This function is called right before every frame is drawn onscreen.
 -- Use this function to poll input, run game logic, and move sprites.
-
-local trailNum = 3
-local spacingY = 7
-
-function getSignDelta(prev, curr)
-    return (prev < curr) and 1 or ((prev > curr) and -1 or 0)
-end
 
 function checkEdge(x, y)
     local ydiff, xdiff = y - prevy, x - prevx
@@ -168,7 +113,7 @@ function deleteEdge(prevx, prevy, x, y)
 end
 
 function getArrayPos()
-    return getPosToArrayPos(cursorSprite:getPosition())
+    return getPosToArrayPos(getCursorPosition())
 end
 
 function getPrevArrayPos()
@@ -181,22 +126,6 @@ end
 
 function isOnGroup()
     return (level[getArrayPos()] > 0) or (levelWithSegments[getArrayPos()] > 0)
-end
-
-function drawGrid()
-    for i in range(0, SW, CD) do
-        gfx.drawLine(i, 0, i, SH)
-    end
-    for i in range(0, SH, RD) do
-        gfx.drawLine(0, i, SW, i)
-    end
-end
-
-function clearSandboxImg()
-    gfx.pushContext(sandboxImg)
-    gfx.setColor(cc)
-    gfx.fillRect(0, 0, 360, 200)
-    gfx.popContext()
 end
 
 function canStartSegment()
@@ -225,17 +154,13 @@ function playdate.update()
     -- (There are multiple ways to read the d-pad; this is the simplest.)
     -- Note that it is possible for more than one of these directions
     -- to be pressed at once, if the user is pressing diagonally.
-    newTrailNum = math.floor(((450 + playdate.getCrankPosition()) % 360) / 45)
-
-    gfx.animation.blinker.updateAll()
-    paintCursor()
-
-    if trailNum ~= newTrailNum then
-        trailNum = newTrailNum
-        gfx.sprite.redrawBackground()
+    updateBlinks()
+    if (shouldRepaintBlink) then
+        paintCursor(drawMode, isBlinkOn())
+        updateBlinkState()
     end
     if playdate.buttonJustReleased(playdate.kButtonA) then
-        local x, y = cursorSprite:getPosition()
+        local x, y = getCursorPosition()
         if canStartSegment() then
             prevx, prevy = x, y
             drawMode = not drawMode
@@ -256,19 +181,19 @@ function playdate.update()
         gfx.sprite.redrawBackground()
     end
     if playdate.buttonJustReleased(playdate.kButtonUp) then
-        cursorSprite:moveBy(0, -RD)
+        moveCursor(0, -RD)
         gfx.sprite.redrawBackground()
     end
     if playdate.buttonJustReleased(playdate.kButtonRight) then
-        cursorSprite:moveBy(CD, 0)
+        moveCursor(CD, 0)
         gfx.sprite.redrawBackground()
     end
     if playdate.buttonJustReleased(playdate.kButtonDown) then
-        cursorSprite:moveBy(0, RD)
+        moveCursor(0, RD)
         gfx.sprite.redrawBackground()
     end
     if playdate.buttonJustReleased(playdate.kButtonLeft) then
-        cursorSprite:moveBy(-CD, 0)
+        moveCursor(-CD, 0)
         gfx.sprite.redrawBackground()
     end
 
@@ -287,7 +212,7 @@ gfx.sprite.setBackgroundDrawingCallback(
             gfx.drawLine(v)
         end
         if drawMode then
-            local x, y = cursorSprite:getPosition()
+            local x, y = getCursorPosition()
             gfx.drawLine(prevx, prevy, x, y)
         end
         gfx.setLineWidth(1)
@@ -296,28 +221,18 @@ gfx.sprite.setBackgroundDrawingCallback(
 
 gfx.sprite.setBackgroundDrawingCallback(
     function(_x, _y, width, height)
-        if blinker.on and drawMode then
-            local arrPlayerPos = getPrevArrayPos()
-            local highlightedGroup = level[arrPlayerPos]
-            drawLevel(groups, highlightedGroup, arrPlayerPos)
-        elseif blinker.on then
-            local arrPlayerPos = getArrayPos()
-            local highlightedGroup = level[getArrayPos()]
-            drawLevel(groups, highlightedGroup, arrPlayerPos)
+        local arrPlayerPos, highlightedGroup
+        if isBlinkOn() and drawMode then
+            arrPlayerPos = getPrevArrayPos()
+            highlightedGroup = level[arrPlayerPos]
+        elseif isBlinkOn() then
+            arrPlayerPos = getArrayPos()
+            highlightedGroup = level[arrPlayerPos]
         else
-            drawLevel(groups, level, -1)
+            arrPlayerPos = -1
+            -- this seems wrong
+            highlightedGroup = level
         end
+        drawLevel(groups, highlightedGroup, arrPlayerPos)
     end
 )
-
-
-function retryLevel()
-    drawMode = false
-    level, levelWithSegments, groups, linesegs = initLevel()
-    setInitCursorPos()
-    gfx.sprite.redrawBackground()
-end
-
-local menu = playdate.getSystemMenu()
-
-local menuItem, error = menu:addMenuItem("Retry Level", retryLevel)

@@ -90,3 +90,12 @@ function drawDiamond(idx, shouldHighlight)
   gfx.drawPolygon(xStart, yStart + rectHeight / 2, xStart + rectWidth / 2, yStart, xStart + rectWidth,
     yStart + rectHeight / 2, xStart + rectWidth / 2, yStart + rectHeight)
 end
+
+function drawGrid()
+  for i in range(0, SW, CD) do
+    gfx.drawLine(i, 0, i, SH)
+  end
+  for i in range(0, SH, RD) do
+    gfx.drawLine(0, i, SW, i)
+  end
+end

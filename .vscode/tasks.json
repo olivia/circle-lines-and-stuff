@@ -6,14 +6,14 @@
     {
       "label": "sim",
       "type": "shell",
-      "command": "PlaydateSimulator dist.pdx",
+      "command": "PlaydateSimulator Output.pdx",
       "problemMatcher": [],
       "dependsOn": ["compile"]
     },
     {
       "label": "compile",
       "type": "shell",
-      "command": "pdc source dist.pdx",
+      "command": "pdc source Output.pdx",
       "problemMatcher": [],
       "group": {
         "kind": "build",
