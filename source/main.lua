@@ -14,6 +14,8 @@ import "level"
 
 local gfx <const> = playdate.graphics
 local mth <const> = playdate.math
+local sound <const> = playdate.sound
+local synth <const> = playdate.sound.synth
 
 -- Here's our player sprite declaration. We'll scope it to this file because
 -- several functions need to access it.
@@ -23,11 +25,13 @@ local sandboxImg = nil
 local imgOffsetX, imgOffsetY = 20, 20
 local drawMode = false
 local level, groups = makeLevel()
+local levelWithSegments = table.shallowcopy(level)
 local blinker = gfx.animation.blinker.new(800, 800, true)
 local cursorImg = nil
 local cursorSprite = nil
 local prevBlinkState = false
 local linesegs = {}
+local synthSound = synth.new(sound.kWaveNoise)
 
 function initCursor()
     local lw = 3
@@ -90,8 +94,8 @@ function myGameSetUp()
         function(x, y, width, height)
             print("Drawing frame")
             -- gfx.setClipRect(x, y, width, height) -- let's only draw the part of the screen that's dirty
-            -- gfx.clearClipRect()                  -- clear so we don't interfere with drawing that comes after this
             -- gfx.setColor(bc)
+            -- gfx.clearClipRect()                  -- clear so we don't interfere with drawing that comes after this
             -- gfx.drawRect(20, 20, 360, 200)
             drawGrid()
         end
@@ -136,12 +140,16 @@ function getPosToArrayPos(x, y)
     return 1 + math.floor((x // CD) + YD * math.floor(y // RD))
 end
 
-function isOnCircle()
+function isOnGroup()
     return level[getArrayPos()] > 0
 end
 
-function isPrevOnCircle()
+function isPrevOnGroup()
     return level[getPrevArrayPos()] > 0
+end
+
+function isPrevCurrGroupSame()
+    return level[getPrevArrayPos()] == level[getArrayPos()]
 end
 
 function drawGrid()
@@ -161,18 +169,24 @@ function clearSandboxImg()
 end
 
 function canStartSegment()
-    return isOnCircle() and not drawMode
+    return isOnGroup() and not drawMode
 end
 
 function canEndSegment(x, y)
     local lineseg = playdate.geometry.lineSegment.new(prevx, prevy, x, y)
+    local xdiff, ydiff = x - prevx, y - prevy
+
+    if ((math.abs(xdiff) ~= math.abs(ydiff)) and (xdiff ~= 0) and (ydiff ~= 0)) or (not drawMode) then
+        return false
+    end
+
     for _, v in pairs(linesegs) do
         local intersection, ls = lineseg:intersectsLineSegment(v)
         if intersection and (ls:distanceToPoint(playdate.geometry.point.new(x, y)) > 5) and (ls:distanceToPoint(playdate.geometry.point.new(prevx, prevy)) > 5) then
             return false
         end
     end
-    return drawMode
+    return isPrevCurrGroupSame() or (not isOnGroup())
 end
 
 function playdate.update()
@@ -194,9 +208,11 @@ function playdate.update()
         if canStartSegment() then
             prevx, prevy = x, y
             drawMode = not drawMode
+            synthSound:playNote("Db3", 1, 0.1)
         elseif canEndSegment(x, y) then
             linesegs[1 + #linesegs] = playdate.geometry.lineSegment.new(prevx, prevy, x, y)
             drawMode = not drawMode
+            synthSound:playNote("Eb3", 1, 0.1)
         end
         gfx.sprite.redrawBackground()
     end
@@ -231,6 +247,20 @@ end
 
 gfx.sprite.setBackgroundDrawingCallback(
     function(_x, _y, width, height)
+        gfx.setLineWidth(2)
+        for i, v in ipairs(linesegs) do
+            gfx.drawLine(v)
+        end
+        if drawMode then
+            local x, y = playerSprite:getPosition()
+            gfx.drawLine(prevx, prevy, x, y)
+        end
+        gfx.setLineWidth(1)
+    end
+)
+
+gfx.sprite.setBackgroundDrawingCallback(
+    function(_x, _y, width, height)
         if blinker.on and drawMode then
             local arrPlayerPos = getPrevArrayPos()
             local highlightedGroup = level[arrPlayerPos]
@@ -256,18 +286,3 @@ end
 local menu = playdate.getSystemMenu()
 
 local menuItem, error = menu:addMenuItem("Retry Level", retryLevel)
-
-
-gfx.sprite.setBackgroundDrawingCallback(
-    function(_x, _y, width, height)
-        gfx.setLineWidth(2)
-        for i, v in ipairs(linesegs) do
-            gfx.drawLine(v)
-        end
-        if drawMode then
-            local x, y = playerSprite:getPosition()
-            gfx.drawLine(prevx, prevy, x, y)
-        end
-        gfx.setLineWidth(1)
-    end
-)

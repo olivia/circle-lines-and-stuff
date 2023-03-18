@@ -47,11 +47,12 @@ function drawCircle(idx, shouldHighlight)
   local yStart = padding + RD * math.floor(idx / colNum)
   local rectWidth = CD - padding * 2
   local rectHeight = RD - padding * 2
-  if shouldHighlight then
-    gfx.fillCircleInRect(xStart, yStart, rectWidth, rectHeight)
+  if not shouldHighlight then
+    gfx.setColor(wc)
   end
-  gfx.drawCircleInRect(xStart, yStart, rectWidth, rectHeight)
+  gfx.fillCircleInRect(xStart, yStart, rectWidth, rectHeight)
   gfx.setColor(bc)
+  gfx.drawCircleInRect(xStart, yStart, rectWidth, rectHeight)
 end
 
 function drawTriangle(idx, shouldHighlight)
@@ -61,13 +62,14 @@ function drawTriangle(idx, shouldHighlight)
   local yStart = padding + RD * math.floor(idx / colNum)
   local rectWidth = CD - padding * 2
   local rectHeight = RD - padding * 2
-  if shouldHighlight then
-    gfx.fillTriangle(xStart, yStart + rectHeight, xStart + rectWidth / 2, yStart, xStart + rectWidth,
-      yStart + rectHeight)
+  if not shouldHighlight then
+    gfx.setColor(wc)
   end
-  gfx.drawTriangle(xStart, yStart + rectHeight, xStart + rectWidth / 2, yStart, xStart + rectWidth,
+  gfx.fillTriangle(xStart, yStart + rectHeight, xStart + rectWidth / 2, yStart, xStart + rectWidth,
     yStart + rectHeight)
   gfx.setColor(bc)
+  gfx.drawTriangle(xStart, yStart + rectHeight, xStart + rectWidth / 2, yStart, xStart + rectWidth,
+    yStart + rectHeight)
 end
 
 function drawDiamond(idx, shouldHighlight)
@@ -77,11 +79,12 @@ function drawDiamond(idx, shouldHighlight)
   local yStart = padding + RD * math.floor(idx / colNum)
   local rectWidth = CD - padding * 2
   local rectHeight = RD - padding * 2
-  if shouldHighlight then
-    gfx.fillPolygon(xStart, yStart + rectHeight / 2, xStart + rectWidth / 2, yStart, xStart + rectWidth,
-      yStart + rectHeight / 2, xStart + rectWidth / 2, yStart + rectHeight)
+  if not shouldHighlight then
+    gfx.setColor(wc)
   end
-  gfx.drawPolygon(xStart, yStart + rectHeight / 2, xStart + rectWidth / 2, yStart, xStart + rectWidth,
+  gfx.fillPolygon(xStart, yStart + rectHeight / 2, xStart + rectWidth / 2, yStart, xStart + rectWidth,
     yStart + rectHeight / 2, xStart + rectWidth / 2, yStart + rectHeight)
   gfx.setColor(bc)
+  gfx.drawPolygon(xStart, yStart + rectHeight / 2, xStart + rectWidth / 2, yStart, xStart + rectWidth,
+    yStart + rectHeight / 2, xStart + rectWidth / 2, yStart + rectHeight)
 end
