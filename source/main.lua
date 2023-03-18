@@ -92,7 +92,6 @@ function myGameSetUp()
 
     gfx.sprite.setBackgroundDrawingCallback(
         function(x, y, width, height)
-            print("Drawing frame")
             -- gfx.setClipRect(x, y, width, height) -- let's only draw the part of the screen that's dirty
             -- gfx.setColor(bc)
             -- gfx.clearClipRect()                  -- clear so we don't interfere with drawing that comes after this
@@ -128,6 +127,49 @@ local prevx, prevy = playerSprite:getPosition()
 local trailNum = 3
 local spacingY = 7
 
+function getSignDelta(prev, curr)
+    return (prev < curr) and 1 or ((prev > curr) and -1 or 0)
+end
+
+function checkEdge(x, y)
+    local ydiff, xdiff = y - prevy, x - prevx
+    local iternum = math.max(math.abs(ydiff), math.abs(xdiff)) // CD
+    local xDelta = CD * getSignDelta(prevx, x)
+    local yDelta = RD * getSignDelta(prevy, y)
+    local group = math.max(levelWithSegments[getPrevArrayPos()], level[getPrevArrayPos()])
+    for i in range(0, iternum, 1) do
+        local arrayIdx = getPosToArrayPos(prevx + i * xDelta, prevy + i * yDelta)
+        local currGroup = math.max(levelWithSegments[arrayIdx], level[arrayIdx])
+        if (currGroup ~= 0 and currGroup ~= group) then
+            return false
+        end
+    end
+    return true
+end
+
+function walkEdge(x, y)
+    local ydiff, xdiff = y - prevy, x - prevx
+    local iternum = math.max(math.abs(ydiff), math.abs(xdiff)) // CD
+    local xDelta = CD * getSignDelta(prevx, x)
+    local yDelta = RD * getSignDelta(prevy, y)
+    local group = math.max(levelWithSegments[getPrevArrayPos()], level[getPrevArrayPos()])
+    for i in range(0, iternum, 1) do
+        local arrayIdx = getPosToArrayPos(prevx + i * xDelta, prevy + i * yDelta)
+        levelWithSegments[arrayIdx] = group
+    end
+end
+
+function deleteEdge(prevx, prevy, x, y)
+    local ydiff, xdiff = y - prevy, x - prevx
+    local iternum = math.max(math.abs(ydiff), math.abs(xdiff)) // CD
+    local xDelta = CD * getSignDelta(prevx, x)
+    local yDelta = RD * getSignDelta(prevy, y)
+    for i in range(0, iternum, 1) do
+        local arrayIdx = getPosToArrayPos(prevx + i * xDelta, prevy + i * yDelta)
+        levelWithSegments[arrayIdx] = 0
+    end
+end
+
 function getArrayPos()
     return getPosToArrayPos(playerSprite:getPosition())
 end
@@ -141,15 +183,7 @@ function getPosToArrayPos(x, y)
 end
 
 function isOnGroup()
-    return level[getArrayPos()] > 0
-end
-
-function isPrevOnGroup()
-    return level[getPrevArrayPos()] > 0
-end
-
-function isPrevCurrGroupSame()
-    return level[getPrevArrayPos()] == level[getArrayPos()]
+    return (level[getArrayPos()] > 0) or (levelWithSegments[getArrayPos()] > 0)
 end
 
 function drawGrid()
@@ -176,7 +210,7 @@ function canEndSegment(x, y)
     local lineseg = playdate.geometry.lineSegment.new(prevx, prevy, x, y)
     local xdiff, ydiff = x - prevx, y - prevy
 
-    if ((math.abs(xdiff) ~= math.abs(ydiff)) and (xdiff ~= 0) and (ydiff ~= 0)) or (not drawMode) then
+    if ((math.abs(xdiff) ~= math.abs(ydiff)) and (xdiff ~= 0) and (ydiff ~= 0)) or (not drawMode) or (not checkEdge(x, y)) then
         return false
     end
 
@@ -186,7 +220,7 @@ function canEndSegment(x, y)
             return false
         end
     end
-    return isPrevCurrGroupSame() or (not isOnGroup())
+    return true
 end
 
 function playdate.update()
@@ -210,6 +244,7 @@ function playdate.update()
             drawMode = not drawMode
             synthSound:playNote("Db3", 1, 0.1)
         elseif canEndSegment(x, y) then
+            walkEdge(x, y)
             linesegs[1 + #linesegs] = playdate.geometry.lineSegment.new(prevx, prevy, x, y)
             drawMode = not drawMode
             synthSound:playNote("Eb3", 1, 0.1)
@@ -217,7 +252,10 @@ function playdate.update()
         gfx.sprite.redrawBackground()
     end
     if playdate.buttonJustReleased(playdate.kButtonB) then
-        table.remove(linesegs, #linesegs)
+        local lineseg = table.remove(linesegs, #linesegs)
+        if lineseg ~= nil then
+            deleteEdge(lineseg:unpack())
+        end
         gfx.sprite.redrawBackground()
     end
     if playdate.buttonJustReleased(playdate.kButtonUp) then
