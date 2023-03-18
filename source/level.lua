@@ -11,8 +11,9 @@ import "constants"
 -- NOTE: Because it's local, you'll have to do it in every .lua source file.
 
 local gfx <const> = playdate.graphics
-function makeLevel()
+function initLevel()
   local lookup = {}
+  local lookupWithSegments = {}
   local drawList = { {}, {}, {} }
   for i = 0, (SH * SW) / (CD * RD) do
     if math.random() < 0.1 then
@@ -22,8 +23,9 @@ function makeLevel()
     else
       table.insert(lookup, 0)
     end
+    table.insert(lookupWithSegments, 0)
   end
-  return lookup, drawList
+  return lookup, lookupWithSegments, drawList, {}
 end
 
 function drawLevel(a, highlightedGroup, arrPlayerPos)

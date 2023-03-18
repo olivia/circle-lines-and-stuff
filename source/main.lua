@@ -20,21 +20,23 @@ local synth <const> = playdate.sound.synth
 -- Here's our player sprite declaration. We'll scope it to this file because
 -- several functions need to access it.
 
-local playerSprite = nil
 local sandboxImg = nil
 local imgOffsetX, imgOffsetY = 20, 20
 local drawMode = false
-local level, groups = makeLevel()
-local levelWithSegments = table.shallowcopy(level)
+local level, levelWithSegments, groups, linesegs = initLevel()
 local blinker = gfx.animation.blinker.new(800, 800, true)
 local cursorImg = nil
 local cursorSprite = nil
 local prevBlinkState = false
-local linesegs = {}
 local synthSound = synth.new(sound.kWaveNoise)
+
+function setInitCursorPos()
+    cursorSprite:moveTo(CD / 2, RD / 2) -- this is where the center of the sprite is placed; (200,120) is the center of the Playdate screen
+end
 
 function initCursor()
     local lw = 3
+    setInitCursorPos()
     gfx.pushContext(cursorImg)
     gfx.setLineWidth(lw)
     gfx.setColor(gfx.kColorBlack)
@@ -67,19 +69,14 @@ function myGameSetUp()
     cursorImg = gfx.image.new(CD + 3, RD + 3)
     sandboxImg = gfx.image.new(360, 200)
 
-    playerSprite = gfx.sprite.new(cursorImg)
-    playerSprite:moveTo(CD / 2, RD / 2) -- this is where the center of the sprite is placed; (200,120) is the center of the Playdate screen
-
-
+    cursorSprite = gfx.sprite.new(cursorImg)
     initCursor()
     local sandboxSprite = gfx.sprite.new(sandboxImg)
     gfx.sprite.add(sandboxSprite)
-    gfx.sprite.add(playerSprite)
+    gfx.sprite.add(cursorSprite)
     blinker:startLoop()
-    --    gfx.sprite.add(cursorSprite)
 
 
-    --sandboxSprite:moveTo(180 + imgOffsetX, 100 + imgOffsetY)
     -- We want an environment displayed behind our sprite.
     -- There are generally two ways to do this:
     -- 1) Use setBackgroundDrawingCallback() to draw a background image. (This is what we're doing below.)
@@ -118,7 +115,7 @@ end
 -- controlled by the OS calling `playdate.update()` 30 times a second.
 
 myGameSetUp()
-local prevx, prevy = playerSprite:getPosition()
+local prevx, prevy = cursorSprite:getPosition()
 
 -- `playdate.update()` is the heart of every Playdate game.
 -- This function is called right before every frame is drawn onscreen.
@@ -171,7 +168,7 @@ function deleteEdge(prevx, prevy, x, y)
 end
 
 function getArrayPos()
-    return getPosToArrayPos(playerSprite:getPosition())
+    return getPosToArrayPos(cursorSprite:getPosition())
 end
 
 function getPrevArrayPos()
@@ -238,7 +235,7 @@ function playdate.update()
         gfx.sprite.redrawBackground()
     end
     if playdate.buttonJustReleased(playdate.kButtonA) then
-        local x, y = playerSprite:getPosition()
+        local x, y = cursorSprite:getPosition()
         if canStartSegment() then
             prevx, prevy = x, y
             drawMode = not drawMode
@@ -259,19 +256,19 @@ function playdate.update()
         gfx.sprite.redrawBackground()
     end
     if playdate.buttonJustReleased(playdate.kButtonUp) then
-        playerSprite:moveBy(0, -RD)
+        cursorSprite:moveBy(0, -RD)
         gfx.sprite.redrawBackground()
     end
     if playdate.buttonJustReleased(playdate.kButtonRight) then
-        playerSprite:moveBy(CD, 0)
+        cursorSprite:moveBy(CD, 0)
         gfx.sprite.redrawBackground()
     end
     if playdate.buttonJustReleased(playdate.kButtonDown) then
-        playerSprite:moveBy(0, RD)
+        cursorSprite:moveBy(0, RD)
         gfx.sprite.redrawBackground()
     end
     if playdate.buttonJustReleased(playdate.kButtonLeft) then
-        playerSprite:moveBy(-CD, 0)
+        cursorSprite:moveBy(-CD, 0)
         gfx.sprite.redrawBackground()
     end
 
@@ -290,7 +287,7 @@ gfx.sprite.setBackgroundDrawingCallback(
             gfx.drawLine(v)
         end
         if drawMode then
-            local x, y = playerSprite:getPosition()
+            local x, y = cursorSprite:getPosition()
             gfx.drawLine(prevx, prevy, x, y)
         end
         gfx.setLineWidth(1)
@@ -313,12 +310,11 @@ gfx.sprite.setBackgroundDrawingCallback(
     end
 )
 
+
 function retryLevel()
-    linesegs = {}
-    level, groups = makeLevel()
-    levelWithSegments = table.shallowcopy(level)
     drawMode = false
-    playerSprite:moveTo(1 + CD / 2, 1 + RD / 2) -- this is where the center of the sprite is placed; (200,120) is the center of the Playdate screen
+    level, levelWithSegments, groups, linesegs = initLevel()
+    setInitCursorPos()
     gfx.sprite.redrawBackground()
 end
 
