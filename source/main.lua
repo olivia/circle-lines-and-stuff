@@ -316,6 +316,7 @@ gfx.sprite.setBackgroundDrawingCallback(
 function retryLevel()
     linesegs = {}
     level, groups = makeLevel()
+    levelWithSegments = table.shallowcopy(level)
     drawMode = false
     playerSprite:moveTo(1 + CD / 2, 1 + RD / 2) -- this is where the center of the sprite is placed; (200,120) is the center of the Playdate screen
     gfx.sprite.redrawBackground()
