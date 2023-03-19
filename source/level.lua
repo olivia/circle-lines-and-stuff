@@ -14,18 +14,28 @@ local gfx <const> = playdate.graphics
 function initLevel()
   local lookup = {}
   local lookupWithSegments = {}
+  local randomRate = 0.04
   local drawList = { {}, {}, {} }
-  for i = 0, (SH * SW) / (CD * RD) do
-    if math.random() < 0.1 then
+  for i = 1, (SH * SW) / (CD * RD) do
+    if math.random() < randomRate then
       local group = math.ceil(math.random() * 3)
       table.insert(drawList[group], i)
       table.insert(lookup, { group = group })
+      table.insert(lookupWithSegments, { group = group, idx = i, edges = {} })
     else
       table.insert(lookup, { group = 0 })
+      table.insert(lookupWithSegments, { group = 0, idx = i, edges = {} })
     end
-    table.insert(lookupWithSegments, { group = 0 })
   end
   return lookup, lookupWithSegments, drawList, {}
+end
+
+function getVisitList()
+  local visitList = table.create((SH * SW) / (CD * RD))
+  for i = 1, (SH * SW) / (CD * RD) do
+    visitList[i] = 0
+  end
+  return visitList
 end
 
 function drawLevel(groups, highlightedGroup, arrPlayerPos)
@@ -35,7 +45,7 @@ function drawLevel(groups, highlightedGroup, arrPlayerPos)
   local fnArrLength = #drawingFns
   for _, v in ipairs(groups) do
     for __, g in ipairs(v) do
-      drawingFns[1 + (_ - 1) % fnArrLength](g, _ == highlightedGroup and (g + 1) ~= arrPlayerPos)
+      drawingFns[1 + (_ - 1) % fnArrLength](g - 1, _ == highlightedGroup and (g) ~= arrPlayerPos)
     end
   end
 

@@ -52,10 +52,6 @@ function myGameSetUp()
     )
 end
 
--- Now we'll call the function above to configure our game.
--- After this runs (it just runs once), nearly everything will be
--- controlled by the OS calling `playdate.update()` 30 times a second.
-
 myGameSetUp()
 local prevx, prevy = getCursorPosition()
 
@@ -96,9 +92,17 @@ function walkEdge(x, y)
     local xDelta = CD * getSignDelta(prevx, x)
     local yDelta = RD * getSignDelta(prevy, y)
     local group = math.max(levelWithSegments[getPrevArrayPos()].group, level[getPrevArrayPos()].group)
+    local prevNode = nil
     for i in range(0, iternum, 1) do
         local arrayIdx = getPosToArrayPos(prevx + i * xDelta, prevy + i * yDelta)
-        levelWithSegments[arrayIdx] = { group = group }
+        local currNode = levelWithSegments[arrayIdx]
+        currNode.group = group
+        if (prevNode ~= nil and table.indexOfElement(currNode.edges, prevNode) == nil) then
+            table.insert(currNode.edges, prevNode)
+            table.insert(prevNode.edges, currNode)
+            print("linking", prevNode.idx, currNode.idx)
+        end
+        prevNode = currNode
     end
 end
 
@@ -107,10 +111,85 @@ function deleteEdge(prevx, prevy, x, y)
     local iternum = math.max(math.abs(ydiff), math.abs(xdiff)) // CD
     local xDelta = CD * getSignDelta(prevx, x)
     local yDelta = RD * getSignDelta(prevy, y)
+    local prevNode = nil
     for i in range(0, iternum, 1) do
         local arrayIdx = getPosToArrayPos(prevx + i * xDelta, prevy + i * yDelta)
-        levelWithSegments[arrayIdx] = { group = 0 }
+        local currNode = levelWithSegments[arrayIdx]
+        if (prevNode ~= nil) then
+            local cpIdx = table.indexOfElement(currNode.edges, prevNode)
+            local pcIdx = table.indexOfElement(prevNode.edges, currNode)
+            table.remove(currNode.edges, cpIdx)
+            table.remove(prevNode.edges, pcIdx)
+        end
+        prevNode = currNode
     end
+    for i in range(0, iternum, 1) do
+        local arrayIdx = getPosToArrayPos(prevx + i * xDelta, prevy + i * yDelta)
+        local currNode = levelWithSegments[arrayIdx]
+        if (#currNode.edges == 0) then
+            currNode.group = 0
+        end
+        prevNode = currNode
+    end
+end
+
+-- is not an edge node
+function isRealNode(node)
+    if (level[node.idx].group ~= 0) then
+        return true
+    end
+    return false
+end
+
+-- bfs
+function traversePath(node, visitorList)
+    if node == nil then
+        return 0
+    end
+    local pathCount = 0
+    visitorList[node.idx] = 1
+    if isRealNode(node) then
+        print("Index is real", node.idx, node.group)
+        pathCount = 1
+    end
+    for _, v in pairs(node.edges) do
+        if visitorList[v.idx] == 0 then
+            print("Traversing", v.idx, pathCount, node.idx)
+            pathCount = pathCount + traversePath(v, visitorList)
+        end
+    end
+    return pathCount
+end
+
+function allPathsCompleted()
+    for i, v in ipairs(groups) do
+        print("attempting path", i)
+        if (not pathIsCompleted(i)) then
+            print("path is not compelte", i)
+            return false
+        end
+    end
+    return true
+end
+
+function pathIsCompleted(groupNum)
+    local groupPath = {}
+    local visitorList = getVisitList()
+    for i, v in ipairs(levelWithSegments) do
+        if v.group == groupNum and isRealNode(v) then
+            table.insert(groupPath, v)
+        end
+    end
+    local pathLength = 0
+    if #groupPath then
+        pathLength = traversePath(groupPath[1], visitorList)
+    end
+    print(groupNum, #groupPath, pathLength)
+    return #groupPath == pathLength
+end
+
+function currentPositionGroup()
+    return levelWithSegments[getPosToArrayPos(getCursorPosition())].group
 end
 
 function getArrayPos()
@@ -122,7 +201,8 @@ function getPrevArrayPos()
 end
 
 function getPosToArrayPos(x, y)
-    return 1 + math.floor((x // CD) + YD * math.floor(y // RD))
+    local pos = math.floor((x // CD) + YD * math.floor(y // RD))
+    return pos + 1
 end
 
 function isOnGroup()
@@ -168,9 +248,13 @@ function playdate.update()
             synthSound:playNote("Db3", 1, 0.1)
         elseif canEndSegment(x, y) then
             walkEdge(x, y)
-            linesegs[1 + #linesegs] = playdate.geometry.lineSegment.new(prevx, prevy, x, y)
+            table.insert(linesegs, playdate.geometry.lineSegment.new(prevx, prevy, x, y))
             drawMode = not drawMode
             synthSound:playNote("Eb3", 1, 0.1)
+
+            if allPathsCompleted() then
+                playVictoryScreen()
+            end
         end
         gfx.sprite.redrawBackground()
     end
