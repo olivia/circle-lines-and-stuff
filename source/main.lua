@@ -61,6 +61,7 @@ function retryLevel()
     setInitCursorPos()
     prevx, prevy = getCursorPosition()
     gfx.sprite.redrawBackground()
+    stopVictoryScreen()
 end
 
 local menu = playdate.getSystemMenu()
@@ -259,9 +260,13 @@ function playdate.update()
         gfx.sprite.redrawBackground()
     end
     if playdate.buttonJustReleased(playdate.kButtonB) then
-        local lineseg = table.remove(linesegs, #linesegs)
-        if lineseg ~= nil then
-            deleteEdge(lineseg:unpack())
+        if not drawMode then
+            local lineseg = table.remove(linesegs, #linesegs)
+            if lineseg ~= nil then
+                deleteEdge(lineseg:unpack())
+            end
+        else
+            drawMode = false
         end
         gfx.sprite.redrawBackground()
     end

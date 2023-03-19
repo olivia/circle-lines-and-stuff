@@ -11,3 +11,8 @@ function playVictoryScreen()
     victorySprite:add()
     victorySprite:setAnimator(victoryA)
 end
+
+function stopVictoryScreen()
+    victorySprite:removeAnimator()
+    victorySprite:moveTo(200, -120)
+end
