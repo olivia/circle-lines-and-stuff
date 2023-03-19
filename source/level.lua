@@ -14,7 +14,7 @@ local gfx <const> = playdate.graphics
 function initLevel()
   local lookup = {}
   local lookupWithSegments = {}
-  local randomRate = 0.04
+  local randomRate = 0.1
   local drawList = { {}, {}, {} }
   for i = 1, (SH * SW) / (CD * RD) do
     if math.random() < randomRate then
