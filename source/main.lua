@@ -166,7 +166,7 @@ function allPathsCompleted()
     for i, v in ipairs(groups) do
         print("attempting path", i)
         if (not pathIsCompleted(i)) then
-            print("path is not compelte", i)
+            print("path is not completed", i)
             return false
         end
     end
