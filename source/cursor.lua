@@ -43,3 +43,9 @@ end
 function moveCursor(x, y)
     return cursorSprite:moveBy(x, y)
 end
+
+function canMoveCursor(deltax, deltay)
+    local x, y = getCursorPosition()
+    local newx, newy = x + deltax, y + deltay
+    return 0 <= newx and newx <= 400 and 0 <= newy and newy <= 240
+end

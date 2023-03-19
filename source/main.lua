@@ -9,6 +9,7 @@ import "utils"
 import "cursor"
 import "blink"
 import "level"
+import "victory"
 
 
 -- Declaring this "gfx" shorthand will make your life easier. Instead of having
@@ -78,10 +79,10 @@ function checkEdge(x, y)
     local iternum = math.max(math.abs(ydiff), math.abs(xdiff)) // CD
     local xDelta = CD * getSignDelta(prevx, x)
     local yDelta = RD * getSignDelta(prevy, y)
-    local group = math.max(levelWithSegments[getPrevArrayPos()], level[getPrevArrayPos()])
+    local group = math.max(levelWithSegments[getPrevArrayPos()].group, level[getPrevArrayPos()].group)
     for i in range(0, iternum, 1) do
         local arrayIdx = getPosToArrayPos(prevx + i * xDelta, prevy + i * yDelta)
-        local currGroup = math.max(levelWithSegments[arrayIdx], level[arrayIdx])
+        local currGroup = math.max(levelWithSegments[arrayIdx].group, level[arrayIdx].group)
         if (currGroup ~= 0 and currGroup ~= group) then
             return false
         end
@@ -94,10 +95,10 @@ function walkEdge(x, y)
     local iternum = math.max(math.abs(ydiff), math.abs(xdiff)) // CD
     local xDelta = CD * getSignDelta(prevx, x)
     local yDelta = RD * getSignDelta(prevy, y)
-    local group = math.max(levelWithSegments[getPrevArrayPos()], level[getPrevArrayPos()])
+    local group = math.max(levelWithSegments[getPrevArrayPos()].group, level[getPrevArrayPos()].group)
     for i in range(0, iternum, 1) do
         local arrayIdx = getPosToArrayPos(prevx + i * xDelta, prevy + i * yDelta)
-        levelWithSegments[arrayIdx] = group
+        levelWithSegments[arrayIdx] = { group = group }
     end
 end
 
@@ -108,7 +109,7 @@ function deleteEdge(prevx, prevy, x, y)
     local yDelta = RD * getSignDelta(prevy, y)
     for i in range(0, iternum, 1) do
         local arrayIdx = getPosToArrayPos(prevx + i * xDelta, prevy + i * yDelta)
-        levelWithSegments[arrayIdx] = 0
+        levelWithSegments[arrayIdx] = { group = 0 }
     end
 end
 
@@ -125,7 +126,7 @@ function getPosToArrayPos(x, y)
 end
 
 function isOnGroup()
-    return (level[getArrayPos()] > 0) or (levelWithSegments[getArrayPos()] > 0)
+    return (level[getArrayPos()].group > 0) or (levelWithSegments[getArrayPos()].group > 0)
 end
 
 function canStartSegment()
@@ -181,20 +182,28 @@ function playdate.update()
         gfx.sprite.redrawBackground()
     end
     if playdate.buttonJustReleased(playdate.kButtonUp) then
-        moveCursor(0, -RD)
-        gfx.sprite.redrawBackground()
+        if (canMoveCursor(0, -RD)) then
+            moveCursor(0, -RD)
+            gfx.sprite.redrawBackground()
+        end
     end
     if playdate.buttonJustReleased(playdate.kButtonRight) then
-        moveCursor(CD, 0)
-        gfx.sprite.redrawBackground()
+        if (canMoveCursor(CD, 0)) then
+            moveCursor(CD, 0)
+            gfx.sprite.redrawBackground()
+        end
     end
     if playdate.buttonJustReleased(playdate.kButtonDown) then
-        moveCursor(0, RD)
-        gfx.sprite.redrawBackground()
+        if (canMoveCursor(0, RD)) then
+            moveCursor(0, RD)
+            gfx.sprite.redrawBackground()
+        end
     end
     if playdate.buttonJustReleased(playdate.kButtonLeft) then
-        moveCursor(-CD, 0)
-        gfx.sprite.redrawBackground()
+        if (canMoveCursor(-CD, 0)) then
+            moveCursor(-CD, 0)
+            gfx.sprite.redrawBackground()
+        end
     end
 
     -- Call the functions below in playdate.update() to draw sprites and keep
@@ -224,10 +233,10 @@ gfx.sprite.setBackgroundDrawingCallback(
         local arrPlayerPos, highlightedGroup
         if isBlinkOn() and drawMode then
             arrPlayerPos = getPrevArrayPos()
-            highlightedGroup = level[arrPlayerPos]
+            highlightedGroup = level[arrPlayerPos].group
         elseif isBlinkOn() then
             arrPlayerPos = getArrayPos()
-            highlightedGroup = level[arrPlayerPos]
+            highlightedGroup = level[arrPlayerPos].group
         else
             arrPlayerPos = -1
             -- this seems wrong

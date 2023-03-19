@@ -19,21 +19,21 @@ function initLevel()
     if math.random() < 0.1 then
       local group = math.ceil(math.random() * 3)
       table.insert(drawList[group], i)
-      table.insert(lookup, group)
+      table.insert(lookup, { group = group })
     else
-      table.insert(lookup, 0)
+      table.insert(lookup, { group = 0 })
     end
-    table.insert(lookupWithSegments, 0)
+    table.insert(lookupWithSegments, { group = 0 })
   end
   return lookup, lookupWithSegments, drawList, {}
 end
 
-function drawLevel(a, highlightedGroup, arrPlayerPos)
+function drawLevel(groups, highlightedGroup, arrPlayerPos)
   gfx.setLineWidth(2)
   gfx.setColor(bc)
   local drawingFns = { drawCircle, drawTriangle, drawDiamond }
   local fnArrLength = #drawingFns
-  for _, v in ipairs(a) do
+  for _, v in ipairs(groups) do
     for __, g in ipairs(v) do
       drawingFns[1 + (_ - 1) % fnArrLength](g, _ == highlightedGroup and (g + 1) ~= arrPlayerPos)
     end
