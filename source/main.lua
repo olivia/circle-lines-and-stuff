@@ -10,28 +10,29 @@ import "cursor"
 import "blink"
 import "level"
 import "victory"
-
+import "puzzles"
 
 -- Declaring this "gfx" shorthand will make your life easier. Instead of having
 -- to preface all graphics calls with "playdate.graphics", just use "gfx."
 -- Performance will be slightly enhanced, too.
 -- NOTE: Because it's local, you'll have to do it in every .lua source file.
 
-local gfx <const> = playdate.graphics
-local sound <const> = playdate.sound
-local synth <const> = playdate.sound.synth
+local gfx<const> = playdate.graphics
+local sound<const> = playdate.sound
+local synth<const> = playdate.sound.synth
 
 -- Here's our player sprite declaration. We'll scope it to this file because
 -- several functions need to access it.
 
 local drawMode = false
-local level, levelWithSegments, groups, linesegs = initLevel()
-local synthSound = synth.new(sound.kWaveNoise)
+local level, levelWithSegments, groups, linesegs
+local synthSound = synth.new(sound.kWaveSine)
 
 function myGameSetUp()
     -- Set up the player sprite.
     -- The :setCenter() call specifies that the sprite will be anchored at its center.
     -- The :moveTo() call moves our sprite to the center of the display.
+    level, levelWithSegments, groups, linesegs = getRandomPuzzle()
     initCursor()
     initBlinker()
     startBlinkLoop()
@@ -41,15 +42,13 @@ function myGameSetUp()
     -- 2) Use a tilemap, assign it to a sprite with sprite:setTilemap(tilemap),
     --       and call :setZIndex() with some low number so the background stays behind
     --       your other sprites.
-    gfx.sprite.setBackgroundDrawingCallback(
-        function(x, y, width, height)
-            -- gfx.setClipRect(x, y, width, height) -- let's only draw the part of the screen that's dirty
-            -- gfx.setColor(bc)
-            -- gfx.clearClipRect()                  -- clear so we don't interfere with drawing that comes after this
-            -- gfx.drawRect(20, 20, 360, 200)
-            drawGrid()
-        end
-    )
+    gfx.sprite.setBackgroundDrawingCallback(function(x, y, width, height)
+        -- gfx.setClipRect(x, y, width, height) -- let's only draw the part of the screen that's dirty
+        -- gfx.setColor(bc)
+        -- gfx.clearClipRect()                  -- clear so we don't interfere with drawing that comes after this
+        -- gfx.drawRect(20, 20, 360, 200)
+        drawGrid()
+    end)
 end
 
 myGameSetUp()
@@ -57,7 +56,16 @@ local prevx, prevy = getCursorPosition()
 
 function retryLevel()
     drawMode = false
-    level, levelWithSegments, groups, linesegs = initLevel()
+    level, levelWithSegments, groups, linesegs = getPuzzle(CURRENT_PUZZLE_IDX)
+    setInitCursorPos()
+    prevx, prevy = getCursorPosition()
+    gfx.sprite.redrawBackground()
+    stopVictoryScreen()
+end
+
+function nextLevel()
+    drawMode = false
+    level, levelWithSegments, groups, linesegs = getRandomPuzzle()
     setInitCursorPos()
     prevx, prevy = getCursorPosition()
     gfx.sprite.redrawBackground()
@@ -65,7 +73,8 @@ function retryLevel()
 end
 
 local menu = playdate.getSystemMenu()
-menu:addMenuItem("Retry Level", retryLevel)
+menu:addMenuItem("retry", retryLevel)
+menu:addMenuItem("Next level", nextLevel)
 
 -- `playdate.update()` is the heart of every Playdate game.
 -- This function is called right before every frame is drawn onscreen.
@@ -218,13 +227,15 @@ function canEndSegment(x, y)
     local lineseg = playdate.geometry.lineSegment.new(prevx, prevy, x, y)
     local xdiff, ydiff = x - prevx, y - prevy
 
-    if ((math.abs(xdiff) ~= math.abs(ydiff)) and (xdiff ~= 0) and (ydiff ~= 0)) or (not drawMode) or (not checkEdge(x, y)) then
+    if ((math.abs(xdiff) ~= math.abs(ydiff)) and (xdiff ~= 0) and (ydiff ~= 0)) or (not drawMode) or
+        (not checkEdge(x, y)) then
         return false
     end
 
     for _, v in pairs(linesegs) do
         local intersection, ls = lineseg:intersectsLineSegment(v)
-        if intersection and (ls:distanceToPoint(playdate.geometry.point.new(x, y)) > 5) and (ls:distanceToPoint(playdate.geometry.point.new(prevx, prevy)) > 5) then
+        if intersection and (ls:distanceToPoint(playdate.geometry.point.new(x, y)) > 5) and
+            (ls:distanceToPoint(playdate.geometry.point.new(prevx, prevy)) > 5) then
             return false
         end
     end
@@ -243,15 +254,17 @@ function playdate.update()
     end
     if playdate.buttonJustReleased(playdate.kButtonA) then
         local x, y = getCursorPosition()
-        if canStartSegment() then
+        if SHOWING_VICTORY then
+            retryLevel()
+        elseif canStartSegment() then
             prevx, prevy = x, y
             drawMode = not drawMode
-            synthSound:playNote("Db3", 1, 0.1)
+            -- synthSound:playNote("Eb3", 1, 0.2)
         elseif canEndSegment(x, y) then
             walkEdge(x, y)
             table.insert(linesegs, playdate.geometry.lineSegment.new(prevx, prevy, x, y))
             drawMode = not drawMode
-            synthSound:playNote("Eb3", 1, 0.1)
+            -- synthSound:playNote("Eb3", 1, 0.2)
 
             if allPathsCompleted() then
                 playVictoryScreen()
@@ -303,34 +316,30 @@ function playdate.update()
     playdate.timer.updateTimers()
 end
 
-gfx.sprite.setBackgroundDrawingCallback(
-    function(_x, _y, width, height)
-        gfx.setLineWidth(2)
-        for i, v in ipairs(linesegs) do
-            gfx.drawLine(v)
-        end
-        if drawMode then
-            local x, y = getCursorPosition()
-            gfx.drawLine(prevx, prevy, x, y)
-        end
-        gfx.setLineWidth(1)
+gfx.sprite.setBackgroundDrawingCallback(function(_x, _y, width, height)
+    gfx.setLineWidth(2)
+    for i, v in ipairs(linesegs) do
+        gfx.drawLine(v)
     end
-)
+    if drawMode then
+        local x, y = getCursorPosition()
+        gfx.drawLine(prevx, prevy, x, y)
+    end
+    gfx.setLineWidth(1)
+end)
 
-gfx.sprite.setBackgroundDrawingCallback(
-    function(_x, _y, width, height)
-        local arrPlayerPos, highlightedGroup
-        if isBlinkOn() and drawMode then
-            arrPlayerPos = getPrevArrayPos()
-            highlightedGroup = level[arrPlayerPos].group
-        elseif isBlinkOn() then
-            arrPlayerPos = getArrayPos()
-            highlightedGroup = level[arrPlayerPos].group
-        else
-            arrPlayerPos = -1
-            -- this seems wrong
-            highlightedGroup = level
-        end
-        drawLevel(groups, highlightedGroup, arrPlayerPos)
+gfx.sprite.setBackgroundDrawingCallback(function(_x, _y, width, height)
+    local arrPlayerPos, highlightedGroup
+    if isBlinkOn() and drawMode then
+        arrPlayerPos = getPrevArrayPos()
+        highlightedGroup = level[arrPlayerPos].group
+    elseif isBlinkOn() then
+        arrPlayerPos = getArrayPos()
+        highlightedGroup = level[arrPlayerPos].group
+    else
+        arrPlayerPos = -1
+        -- this seems wrong
+        highlightedGroup = level
     end
-)
+    drawLevel(groups, highlightedGroup, arrPlayerPos)
+end)
